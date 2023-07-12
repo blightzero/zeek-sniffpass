@@ -3,9 +3,16 @@
 
 module SNIFFPASS;
 
-global username_fields = set("USERNAME", "USRNAME", "UNAME", "EMAIL", "USER", "USR", "LOGIN", "NAME", "AUTH", "LOG");
-global password_fields = set("PASSWORD", "PASS", "PSW", "PWD", "SECRET");
+global username_fields = set("USERNAME", "USRNAME", "UNAME", "EMAIL", "USER", "USR", "LOGIN", "NAME", "AUTH", "LOG","LOGINID", "USERID");
+global password_fields = set("PASSWORD", "PASS", "PSW", "PWD", "SECRET","PASSWD");
 
+type CredPost: record {
+    userId: string &optional;
+    user: string &optional;
+    email: string &optional;
+    pass: string &optional;
+    password: string &optional;
+};
 
 type Credential: record {
     username: string;
@@ -32,6 +39,7 @@ export {
 
 type SPStorage: record {
     inspect_post_data: bool &default=F &log;
+    inspect_post_data_json: bool &default=F &log;
     post_data: string &log &optional;
 };
 
@@ -69,15 +77,25 @@ function cred_handler(cred: Credential, c: connection)
 event http_header(c: connection, is_orig: bool, name: string, value: string)
 {
     if ( is_orig && c$http$method == "POST") {
-        if (to_upper(name) == "CONTENT-TYPE"
-            && to_upper(value) == "APPLICATION/X-WWW-FORM-URLENCODED")
-        {
-            if ( ! c?$sp )
-                c$sp = SPStorage();
+        if (to_upper(name) == "CONTENT-TYPE") {
+            if (to_upper(value) == "APPLICATION/X-WWW-FORM-URLENCODED")
+            {
+                if ( ! c?$sp )
+                    c$sp = SPStorage();
 
-            c$sp$inspect_post_data = T;
-            c$sp$post_data = "";
-    }
+                c$sp$inspect_post_data = T;
+                c$sp$post_data = "";
+            }
+            if (to_upper(value) == "APPLICATION/JSON") 
+            {
+                if ( ! c?$sp )
+                    c$sp = SPStorage();
+
+                c$sp$inspect_post_data = T;
+                c$sp$inspect_post_data_json = T;
+                c$sp$post_data = "";
+            }
+        }
   }
 }
 
@@ -98,32 +116,69 @@ event http_message_done(c: connection, is_orig: bool, stat: http_message_stat)
 {
     if ( is_orig && c?$sp && c$sp$inspect_post_data )
     {
+
         local post_parsed = split_string(c$sp$post_data, /&/);
         local password_seen = F;
         local username_value = "";
         local password_value = "";
 
-        for (p in post_parsed) {
-            local kv = split_string1(post_parsed[p], /=/);
-            if (to_upper(kv[0]) in username_fields) {
-                username_value = kv[1];
-                c$http$post_username = username_value;
-            }
-            if (to_upper(kv[0]) in password_fields) {
-                password_value = kv[1];
-                password_seen = T;
+        if(c$sp$inspect_post_data_json){
 
-                if ( log_password_plaintext )
-                    c$http$post_password_plain = password_value;
-                if ( log_password_md5 )
-                    c$http$post_password_md5 = md5_hash(password_value);
-                if ( log_password_sha1 )
-                    c$http$post_password_sha1 = sha1_hash(password_value);
-                if ( log_password_sha256 )
-                    c$http$post_password_sha256 = sha256_hash(password_value);
+            local u_parts: string_vec;
+            local p_parts: string_vec;
+            local user_pattern = set_to_regex(username_fields, "\\\"(?i:~~)\\\"([[:space:]]*):([[:space:]]*)\\\"[^\"]*\\\"");
+            local password_pattern = set_to_regex(password_fields, "\\\"(?i:~~)\\\"([[:space:]]*):([[:space:]]*)\\\"[^\"]*\\\"");
+
+            local user = find_all(c$sp$post_data, user_pattern);
+            local passext = find_all(c$sp$post_data, password_pattern);
+
+            for ( u in user){
+                    u_parts = split_string(u, /\"/);
+                    if ( |u_parts| == 5) {
+                        username_value = u_parts[3];
+                        c$http$post_username = username_value;
+                    }
+            }
+
+            for ( pp in passext){
+                    p_parts = split_string(pp, /\"/);
+                    if ( |p_parts| == 5) {
+                        password_value = p_parts[3];
+                        password_seen = T;
+                        if ( log_password_plaintext )
+                            c$http$post_password_plain = password_value;
+                        if ( log_password_md5 )
+                            c$http$post_password_md5 = md5_hash(password_value);
+                        if ( log_password_sha1 )
+                            c$http$post_password_sha1 = sha1_hash(password_value);
+                        if ( log_password_sha256 )
+                            c$http$post_password_sha256 = sha256_hash(password_value);
+                    }
+            }
+
+        }
+        else {
+            for (p in post_parsed) {
+                local kv = split_string1(post_parsed[p], /=/);
+                if (to_upper(kv[0]) in username_fields) {
+                    username_value = kv[1];
+                    c$http$post_username = username_value;
+                }
+                if (to_upper(kv[0]) in password_fields) {
+                    password_value = kv[1];
+                    password_seen = T;
+
+                    if ( log_password_plaintext )
+                        c$http$post_password_plain = password_value;
+                    if ( log_password_md5 )
+                        c$http$post_password_md5 = md5_hash(password_value);
+                    if ( log_password_sha1 )
+                        c$http$post_password_sha1 = sha1_hash(password_value);
+                    if ( log_password_sha256 )
+                        c$http$post_password_sha256 = sha256_hash(password_value);
+                }
             }
         }
-
         if ( password_seen ) {
             if ( |username_value| > 0 )
             {

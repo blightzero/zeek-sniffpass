@@ -86,7 +86,7 @@ event http_header(c: connection, is_orig: bool, name: string, value: string)
                 c$sp$inspect_post_data = T;
                 c$sp$post_data = "";
             }
-            if (to_upper(value) == "APPLICATION/JSON") 
+            if (to_upper(value) == "APPLICATION/JSON")
             {
                 if ( ! c?$sp )
                     c$sp = SPStorage();

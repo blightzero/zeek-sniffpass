@@ -3,8 +3,8 @@
 
 module SNIFFPASS;
 
-global username_fields = set("USERNAME", "USRNAME", "UNAME", "EMAIL", "USER", "USR", "LOGIN", "NAME", "AUTH", "LOG","LOGINID", "USERID");
-global password_fields = set("PASSWORD", "PASS", "PSW", "PWD", "SECRET","PASSWD");
+global username_fields = set("ACCOUNT","ACCT","ACCTNAME","AHD_USERNAME","ALIAS","AUTH","DOMAIN","EMAIL","FORM_LOGINNAME","_ID","ID","J_USERNAME","LOG","LOGIN","LOGIN_EMAIL","LOGINEMAIL","LOGIN_ID","LOGINID","LOGINNAME","LOGIN_USERNAME","LOGINUSERNAME","MAILADDRESS","MEMBER","MEMBERNAME","MN","NAME","NICKNAME","POP_LOGIN","PSEUDO","SCREENAME","SESSION_KEY","SESSIONKEY","SIGN-IN","UID","UIN","ULOGIN","UNAME","UNICKNAME","USER","USER_ID","USERID","_USERNAME","USER_NAME","USERNAME","USR","USRNAME","WPNAME");
+global password_fields = set("ADDITIONAL_INFO","AHD_PASSWORD","FORM_PW","J_PASSWORD","LOGIN_PASSWORD","LOGINPASSWORD","LOGIN_PASSWORDPASSWORT","PASS","PASSWD","_PASSWORD","PASSWORD","PASSWORT","PASSWRD","PSW","PW","PWD","SECRET","SESSION_PASSWORD","SESSIONPASSWORD","UPASSWD","UPASSWORD","USERPASSWORD","WPPASSWORD");
 
 type CredPost: record {
     userId: string &optional;
@@ -86,7 +86,7 @@ event http_header(c: connection, is_orig: bool, name: string, value: string)
                 c$sp$inspect_post_data = T;
                 c$sp$post_data = "";
             }
-            if (to_upper(value) == "APPLICATION/JSON")
+            if (to_upper(value) == "APPLICATION/JSON") 
             {
                 if ( ! c?$sp )
                     c$sp = SPStorage();
